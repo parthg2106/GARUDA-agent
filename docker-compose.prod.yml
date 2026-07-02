@@ -1,0 +1,77 @@
+"""Production deployment configuration for GARUDA."""
+
+version: '3.8'
+
+services:
+  garuda-prod:
+    image: garuda:latest
+    container_name: garuda-production
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - DEBUG=False
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./checkpoints:/app/checkpoints:ro
+      - ./models:/app/models:ro
+    restart: always
+    networks:
+      - garuda-prod-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: garuda-db
+    environment:
+      - POSTGRES_USER=garuda
+      - POSTGRES_PASSWORD=garuda_secure_pwd
+      - POSTGRES_DB=garuda
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - garuda-prod-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: garuda-metrics
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - garuda-prod-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: garuda-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=garuda
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - garuda-prod-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  garuda-prod-network:
+    driver: bridge
