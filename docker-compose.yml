@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  garuda:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: garuda-agent
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./checkpoints:/app/checkpoints
+      - ./training_outputs:/app/training_outputs
+      - ./models:/app/models
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - garuda-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: garuda-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - garuda-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+
+networks:
+  garuda-network:
+    driver: bridge
